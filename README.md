@@ -1,5 +1,7 @@
 # @pnpm/package-requester
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/pnpm/package-requester.svg)](https://greenkeeper.io/)
+
 > Concurrent downloader of npm-compatible packages
 
 <!--@shields('npm', 'travis')-->
