@@ -55,6 +55,7 @@ export type PackageResponse = {
     body: {
       isLocal: false,
       inStoreLocation: string,
+      sideEffectsCache: Map<string, string>,
       id: string,
       resolution: Resolution,
       // This is useful for recommending updates.
@@ -95,6 +96,7 @@ export interface RequestPackageOptions {
       type: 'version' | 'range' | 'tag',
     },
   },
+  sideEffectsCache: boolean,
 }
 
 export type RequestPackageFunction = (
@@ -167,6 +169,7 @@ async function resolveAndFetch (
       },
     },
     skipFetch: boolean,
+    sideEffectsCache: boolean,
   },
 ): Promise<PackageResponse> {
   try {
@@ -207,6 +210,7 @@ async function resolveAndFetch (
           manifest: pkg,
           normalizedPref,
           resolution: resolution as DirectoryResolution,
+          sideEffectsCache: await getSideEffectsCache(ctx.storePath, id, options.sideEffectsCache),
         },
       }
     }
@@ -226,6 +230,7 @@ async function resolveAndFetch (
           manifest: pkg,
           normalizedPref,
           resolution,
+          sideEffectsCache: await getSideEffectsCache(ctx.storePath, id, options.sideEffectsCache),
         },
       }
     }
@@ -256,6 +261,7 @@ async function resolveAndFetch (
           manifest: pkg,
           normalizedPref,
           resolution,
+          sideEffectsCache: await getSideEffectsCache(ctx.storePath, id, options.sideEffectsCache),
         },
         fetchingFiles: ctx.fetchingLocker[id].fetchingFiles,
         finishing: ctx.fetchingLocker[id].finishing,
@@ -269,6 +275,7 @@ async function resolveAndFetch (
         latest,
         normalizedPref,
         resolution,
+        sideEffectsCache: await getSideEffectsCache(ctx.storePath, id, options.sideEffectsCache),
       },
       fetchingFiles: ctx.fetchingLocker[id].fetchingFiles,
       fetchingManifest: ctx.fetchingLocker[id].fetchingManifest as Promise<PackageManifest>,
@@ -485,4 +492,24 @@ async function fetcher (
     throw new Error(`Fetching for dependency type "${resolution.type}" is not supported`)
   }
   return await fetch(resolution, target, opts)
+}
+
+async function getSideEffectsCache (storePath: string, id: string, useCache: boolean): Promise<Map<string, string>> {
+  const map = new Map()
+  if (!useCache) {
+    return map
+  }
+
+  const cacheRoot = path.join(storePath, 'side-effects-cache')
+  const dirContents = await fs.readdir(cacheRoot)
+  const isDirectory = async (source: string) => (await fs.lstat(source)).isDirectory()
+  const subDirs = await Promise.all(dirContents.map((content) => path.join(cacheRoot, content)).filter(isDirectory))
+  await Promise.all(subDirs.map(async (dir) => {
+    const nodeMajor = path.basename(dir)
+    const maybeCacheDir = path.join(dir, id)
+    if (await fs.exists(maybeCacheDir)) {
+      map[nodeMajor] = maybeCacheDir
+    }
+  }))
+  return map
 }
