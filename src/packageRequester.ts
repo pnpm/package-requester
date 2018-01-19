@@ -205,7 +205,7 @@ async function resolveAndFetch (
       }
       return {
         body: {
-          cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
+          cacheByEngine: options.sideEffectsCache ? await getCacheByEngine(ctx.storePath, id) : new Map(),
           id,
           isLocal: true,
           manifest: pkg,
@@ -223,7 +223,7 @@ async function resolveAndFetch (
     if (options.skipFetch && pkg) {
       return {
         body: {
-          cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
+          cacheByEngine: options.sideEffectsCache ? await getCacheByEngine(ctx.storePath, id) : new Map(),
           id,
           inStoreLocation: target,
           isLocal: false,
@@ -254,7 +254,7 @@ async function resolveAndFetch (
     if (pkg) {
       return {
         body: {
-          cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
+          cacheByEngine: options.sideEffectsCache ? await getCacheByEngine(ctx.storePath, id) : new Map(),
           id,
           inStoreLocation: target,
           isLocal: false,
@@ -269,7 +269,7 @@ async function resolveAndFetch (
     }
     return {
       body: {
-        cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
+        cacheByEngine: options.sideEffectsCache ? await getCacheByEngine(ctx.storePath, id) : new Map(),
         id,
         inStoreLocation: target,
         isLocal: false,
@@ -498,6 +498,10 @@ async function getCacheByEngine (storePath: string, id: string): Promise<Map<str
   const map = new Map()
 
   const cacheRoot = path.join(storePath, id, 'side_effects')
+  if (!await fs.exists(cacheRoot)) {
+    return map
+  }
+
   const dirContents = (await fs.readdir(cacheRoot)).map((content) => path.join(cacheRoot, content))
   await Promise.all(dirContents.map(async (dir) => {
     if (!(await fs.lstat(dir)).isDirectory()) {
