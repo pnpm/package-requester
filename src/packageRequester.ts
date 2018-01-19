@@ -55,7 +55,7 @@ export type PackageResponse = {
     body: {
       isLocal: false,
       inStoreLocation: string,
-      sideEffectsCache: Map<string, string>,
+      cacheByEngine: Map<string, string>,
       id: string,
       resolution: Resolution,
       // This is useful for recommending updates.
@@ -205,12 +205,12 @@ async function resolveAndFetch (
       }
       return {
         body: {
+          cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
           id,
           isLocal: true,
           manifest: pkg,
           normalizedPref,
           resolution: resolution as DirectoryResolution,
-          sideEffectsCache: options.sideEffectsCache ? new Map() : await getSideEffectsCache(ctx.storePath, id),
         },
       }
     }
@@ -223,6 +223,7 @@ async function resolveAndFetch (
     if (options.skipFetch && pkg) {
       return {
         body: {
+          cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
           id,
           inStoreLocation: target,
           isLocal: false,
@@ -230,7 +231,6 @@ async function resolveAndFetch (
           manifest: pkg,
           normalizedPref,
           resolution,
-          sideEffectsCache: options.sideEffectsCache ? new Map() : await getSideEffectsCache(ctx.storePath, id),
         },
       }
     }
@@ -254,6 +254,7 @@ async function resolveAndFetch (
     if (pkg) {
       return {
         body: {
+          cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
           id,
           inStoreLocation: target,
           isLocal: false,
@@ -261,7 +262,6 @@ async function resolveAndFetch (
           manifest: pkg,
           normalizedPref,
           resolution,
-          sideEffectsCache: options.sideEffectsCache ? new Map() : await getSideEffectsCache(ctx.storePath, id),
         },
         fetchingFiles: ctx.fetchingLocker[id].fetchingFiles,
         finishing: ctx.fetchingLocker[id].finishing,
@@ -269,13 +269,13 @@ async function resolveAndFetch (
     }
     return {
       body: {
+        cacheByEngine: options.sideEffectsCache ? new Map() : await getCacheByEngine(ctx.storePath, id),
         id,
         inStoreLocation: target,
         isLocal: false,
         latest,
         normalizedPref,
         resolution,
-        sideEffectsCache: options.sideEffectsCache ? new Map() : await getSideEffectsCache(ctx.storePath, id),
       },
       fetchingFiles: ctx.fetchingLocker[id].fetchingFiles,
       fetchingManifest: ctx.fetchingLocker[id].fetchingManifest as Promise<PackageManifest>,
@@ -494,7 +494,7 @@ async function fetcher (
   return await fetch(resolution, target, opts)
 }
 
-async function getSideEffectsCache (storePath: string, id: string): Promise<Map<string, string>> {
+async function getCacheByEngine (storePath: string, id: string): Promise<Map<string, string>> {
   const map = new Map()
 
   const cacheRoot = path.join(storePath, id, 'side_effects')
@@ -503,8 +503,8 @@ async function getSideEffectsCache (storePath: string, id: string): Promise<Map<
     if (!(await fs.lstat(dir)).isDirectory()) {
       return
     }
-    const nodeMajor = path.basename(dir)
-    map[nodeMajor] = dir
+    const engineName = path.basename(dir)
+    map[engineName] = dir
   }))
 
   return map
