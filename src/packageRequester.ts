@@ -508,7 +508,7 @@ async function getCacheByEngine (storePath: string, id: string): Promise<Map<str
       return
     }
     const engineName = path.basename(dir)
-    map[engineName] = path.join(dir, 'cache')
+    map[engineName] = path.join(dir, 'package')
   }))
 
   return map
