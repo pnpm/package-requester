@@ -399,7 +399,7 @@ function fetchToStore (opts: {
         status: 'fetched',
       })
 
-      // fetchingFilse shouldn't care about when this is saved at all
+      // fetchingFiles shouldn't care about when this is saved at all
       if (!targetExists) {
         (async () => {
           if (opts.verifyStoreIntegrity) {
@@ -508,7 +508,7 @@ async function getCacheByEngine (storePath: string, id: string): Promise<Map<str
       return
     }
     const engineName = path.basename(dir)
-    map[engineName] = dir
+    map[engineName] = path.join(dir, 'cache')
   }))
 
   return map
