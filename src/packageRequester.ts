@@ -144,8 +144,9 @@ export default function (
 
   const networkConcurrency = opts.networkConcurrency || 16
   const requestsQueue = new PQueue({
-    concurrency: networkConcurrency,
-  })
+    concurrency: 16,
+    maxWeight: 5 * 1024 * 1024, // 5 MB
+  } as any) // tslint:disable-line
   requestsQueue['counter'] = 0 // tslint:disable-line
   requestsQueue['concurrency'] = networkConcurrency // tslint:disable-line
 
@@ -159,7 +160,7 @@ export default function (
   })
   const requestPackage = resolveAndFetch.bind(null, {
     fetchPackageToStore,
-    requestsQueue,
+    requestsQueue: new PQueue({ concurrency: 16 }),
     resolve,
     storePath: opts.storePath,
   })
@@ -332,7 +333,12 @@ function fetchToStore (
       fetchingRawManifest?: Promise<PackageJson>,
       inStoreLocation: string,
     }>,
-    requestsQueue: {add: <T>(fn: () => Promise<T>, opts: {priority: number}) => Promise<T>},
+    requestsQueue: {add: <T>(
+      fn: (
+        updateRealWeight: (realWeight: number) => void,
+        release: () => void,
+      ) => Promise<T>,
+      opts: {priority: number}) => Promise<T>},
     storeIndex: StoreIndex,
     storePath: string,
   },
@@ -449,19 +455,28 @@ function fetchToStore (
           // However, when one line is left available, allow it to be picked up by a metadata request.
           // This is done in order to avoid situations when tarballs are downloaded in chunks
           // As much tarballs should be downloaded simultaneously as possible.
-          const priority = (++ctx.requestsQueue['counter'] % ctx.requestsQueue['concurrency'] === 0 ? -1 : 1) * 1000 // tslint:disable-line
+          // const priority = (++ctx.requestsQueue['counter'] % ctx.requestsQueue['concurrency'] === 0 ? -1 : 1) * 1000 // tslint:disable-line
+          let totalSize!: number
+          let released = false
 
-          const fetchedPackage = await ctx.requestsQueue.add(() => ctx.fetch(opts.resolution, target, {
+          const fetchedPackage = await ctx.requestsQueue.add((updateRealWeight, release) => ctx.fetch(opts.resolution, target, {
             cachedTarballLocation: path.join(ctx.storePath, opts.pkgId, 'packed.tgz'),
-            onProgress: (downloaded) => {
+            onProgress: (downloaded: number) => {
+              if (!released && downloaded / totalSize >= 0.8) {
+                released = true
+                release()
+              }
               progressLogger.debug({status: 'fetching_progress', pkgId: opts.pkgId, downloaded})
             },
-            onStart: (size, attempt) => {
+            onStart: (size: number, attempt: number) => {
+              totalSize = size
+              // console.log(size) // tslint:disable-line
+              updateRealWeight(size)
               progressLogger.debug({status: 'fetching_started', pkgId: opts.pkgId, size, attempt})
             },
             pkgId: opts.pkgId,
             prefix: opts.prefix,
-          }), {priority})
+          }), {priority: 0}) // TODO: pass in the weight here as well?
 
           filesIndex = fetchedPackage.filesIndex
           tempLocation = fetchedPackage.tempLocation
