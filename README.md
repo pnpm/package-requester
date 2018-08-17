@@ -1,3 +1,5 @@
+> This package has been moved to the [pnpm](https://github.com/pnpm/pnpm) multi-package repository.
+
 # @pnpm/package-requester
 
 > Concurrent downloader of npm-compatible packages
